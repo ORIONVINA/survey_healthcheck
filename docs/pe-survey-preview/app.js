@@ -146,7 +146,178 @@ const PAGES = [
     { id: 'p_rank', code: '2.2 Q2', type: 'rank', t: 'Sau đây là một số hình thức khuyến mãi cho sản phẩm bánh bột/bim bim. Bạn hãy xếp hạng 3 hình thức khuyến mãi mà bạn thích nhất trong danh sách sau đây?', hint: 'Trong đó, 1 – Yêu thích nhất, 2 – Yêu thích thứ nhì, 3 – Yêu thích thứ ba', other: 'p_rank_other', opts: [
       { v: 'giam_gia', l: 'Giảm % hoặc giá trị tiền mặt ngay tại điểm bán (Ví dụ: Giảm 10% khi mua 2 sản phẩm)' },
       { v: 'coupon', l: 'Phiếu giảm giá dùng cho lần mua sau (Ví dụ: Coupon 20k cho lần mua kế tiếp)' },
-      { v: 'goi_tiet_kiem', l: 'Mua gó…2856 tokens truncated…x.append(h('div', { class: 'rate' }, h('div', { class: 'rl' }, r.l), sc));
+      { v: 'goi_tiet_kiem', l: 'Mua gói tiết kiệm: Mua 2 tặng 1, Mua 3 giá 2 (Ví dụ: Combo snack 3 gói giá 2)' },
+      { v: 'tang_trong_luong', l: 'Tặng thêm dung tích hoặc trọng lượng (Ví dụ: Tặng thêm 20% dung tích)' },
+      { v: 'qua_kem', l: 'Tặng quà kèm theo khi mua hàng (Ví dụ: Mua sữa tắm tặng bông tắm)' },
+      { v: 'dung_thu', l: 'Cho dùng thử sản phẩm mới (Ví dụ: Phát mẫu tại siêu thị)' },
+      { v: 'mua_x_tang_y', l: 'Mua X sản phẩm tặng Y (Ví dụ: Mua 2 tặng 1)' },
+      { v: 'combo', l: 'Kết hợp 2 sản phẩm (cùng/khác brand) (Ví dụ: Mua snack tặng nước uống)' },
+      { v: 'quay_thuong', l: 'Mua hàng nhập mã quay thưởng (Ví dụ: Trúng iPhone khi mua bánh)' },
+      { v: 'cao_tem', l: 'Cào tem, mở nắp hoặc quét QR biết kết quả (Ví dụ: Cào trúng xe máy)' },
+      { v: 'tich_diem', l: 'Tích điểm qua app hoặc hóa đơn (Ví dụ: Đổi quà khi đủ điểm)' },
+      { v: 'other', l: 'Khác, vui lòng ghi rõ' }] }] },
+  { sec: 'Phần 3 Thông tin', qs: [
+    { id: 'dm_region', code: '3 Q1', type: 'single', t: 'Bạn đang sinh sống ở khu vực nào?', opts: [
+      { v: 'hcm', l: 'TP. Hồ Chí Minh' }, { v: 'hn', l: 'Hà Nội' }, { v: 'khac', l: 'Khu vực khác (ghi rõ)' }],
+      textFor: { v: 'khac', id: 'dm_region_other', ph: 'Tỉnh/thành phố' } },
+    { id: 'dm_gender', code: '3 Q2', type: 'single', t: 'Giới tính của bạn?', opts: [{ v: 'nam', l: 'Nam' }, { v: 'nu', l: 'Nữ' }] }] },
+  { sec: 'Nhận quà', last: true, qs: [{ id: 'phone', code: 'SĐT', type: 'phone' }, { id: 'consent', code: 'Ô đồng ý', type: 'consent' }] },
+];
+
+// ---- TRẠNG THÁI: chỉ trong bộ nhớ trang ----
+const S = { i: -1, ans: {}, hist: [] };
+const $app = document.getElementById('app');
+
+function h(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (k === 'class') e.className = v;
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else if (v !== false && v != null) e.setAttribute(k, v === true ? '' : v);
+  }
+  for (const k of kids.flat()) if (k != null) e.append(k.nodeType ? k : document.createTextNode(k));
+  return e;
+}
+
+// Tô đỏ các chỗ [CHƯA CHỐT: ...] để chị thấy ngay
+function rich(text) {
+  return String(text).split(/(\[CHƯA CHỐT:[^\]]*\])/).filter(Boolean)
+    .map(p => p.startsWith('[CHƯA CHỐT') ? h('span', { class: 'pending' }, p) : document.createTextNode(p));
+}
+
+const pageVisible = p => !p.when || p.when(S.ans);
+function setProgress(pct) {
+  const visible = PAGES.filter(pageVisible);
+  const current = S.i < 0 ? -1 : visible.indexOf(PAGES[S.i]);
+  const value = pct != null ? pct : (current < 0 ? 0 : Math.round(((current + 1) / visible.length) * 100));
+  document.getElementById('progress').style.width = value + '%';
+  const bar = document.querySelector('.bar');
+  if (bar) bar.setAttribute('aria-valuenow', value);
+  const section = document.getElementById('section-label');
+  const count = document.getElementById('question-count');
+  if (section) section.textContent = S.i < 0 ? 'Khảo sát snack bột/bim bim' : PAGES[S.i].sec;
+  if (count) count.textContent = S.i < 0 ? 'Sẵn sàng bắt đầu' : 'Câu ' + (current + 1) + ' / ' + visible.length;
+}
+
+function reset() {
+  S.i = -1; S.ans = {}; S.hist = [];
+  setProgress(0); window.scrollTo(0, 0);
+  boot();
+}
+const resetBtn = () => h('button', { class: 'reset', onclick: reset }, 'Làm lại từ đầu');
+
+// ---- MÀN HÌNH ĐẦU, DỪNG, CẢM ƠN ----
+function screen(title, text, btn, note) {
+  $app.innerHTML = '';
+  const c = h('div', { class: 'card' }, h('h2', {}, title), h('p', {}, text));
+  if (btn) c.append(btn);
+  if (note) c.append(h('div', { class: 'note' }, note));
+  $app.append(c);
+  if (S.i >= 0) $app.append(resetBtn());
+  requestAnimationFrame(() => c.focus({ preventScroll: true }));
+  c.setAttribute('tabindex', '-1');
+}
+
+function boot() {
+  const btn = h('button', { class: 'primary', onclick: () => go(0) }, COPY.startBtn);
+  screen(COPY.introTitle, COPY.intro, btn);
+  $app.append(h('button', { class: 'reset', onclick: () => {
+    S.i = 0; screen(COPY.closedTitle, COPY.closed, null, 'Xem trước: màn hình này chỉ hiện khi khảo sát đã đủ 100 phiếu.');
+  } }, 'Xem màn hình "Khảo sát đã đủ người"'));
+}
+
+// ---- VẼ TỪNG LOẠI CÂU ----
+function optRow(type, name, o, checked, onchange) {
+  const inp = h('input', { type, name, value: o.v });
+  inp.checked = checked;
+  const row = h('label', { class: 'opt' + (checked ? ' on' : '') }, inp, h('span', {}, o.l));
+  inp.addEventListener('change', onchange);
+  return row;
+}
+const wait = what => h('div', { class: 'ph-wait' }, '[Chờ hình: ' + what + ']');
+
+function renderQ(q) {
+  const A = S.ans;
+  const box = h('div', { class: 'card question-card', 'data-q': q.id, tabindex: '-1' });
+  if (q.code) box.append(h('div', { class: 'qcode' }, q.code));
+  if (q.t) box.append(h('p', { class: 'q-title' }, q.t));
+  if (q.hint) box.append(h('p', { class: 'q-hint' }, q.hint));
+  const redraw = () => box.replaceWith(renderQ(q));
+
+  if (q.type === 'single') {
+    q.opts.forEach(o => {
+      box.append(optRow('radio', q.id, o, A[q.id] === o.v, () => { A[q.id] = o.v; redraw(); }));
+      if (q.textFor && q.textFor.v === o.v && A[q.id] === o.v) {
+        const t = h('input', { type: 'text', placeholder: q.textFor.ph, value: A[q.textFor.id] || '' });
+        t.addEventListener('input', () => { A[q.textFor.id] = t.value; });
+        box.append(h('div', { class: 'sub' }, t));
+      }
+    });
+  }
+
+  if (q.type === 'multi') {
+    const cur = A[q.id] || [];
+    q.opts.forEach(o => {
+      if (o.h) return box.append(h('div', { class: 'group-h' }, o.h));
+      box.append(optRow('checkbox', q.id, o, cur.includes(o.v), e => {
+        let v = (A[q.id] || []).slice();
+        if (e.target.checked) {
+          v = o.excl ? [o.v] : v.filter(x => !q.opts.find(p => p.v === x && p.excl)).concat(o.v);
+        } else v = v.filter(x => x !== o.v);
+        A[q.id] = v; redraw();
+      }));
+      if (o.v === 'other' && q.other && cur.includes('other')) {
+        const t = h('input', { type: 'text', placeholder: 'Ghi rõ', value: A[q.other] || '' });
+        t.addEventListener('input', () => { A[q.other] = t.value; });
+        box.append(h('div', { class: 'sub' }, t));
+      }
+    });
+  }
+
+  if (q.type === 'text' || q.type === 'textarea') {
+    const t = q.type === 'text' ? h('input', { type: 'text', value: A[q.id] || '' }) : h('textarea', {}, A[q.id] || '');
+    t.addEventListener('input', () => { A[q.id] = t.value; });
+    box.append(t);
+  }
+
+  if (q.type === 'images') {
+    const cur = A[q.id] || [];
+    const grid = h('div', { class: 'imgs' });
+    q.opts.filter(o => o.wait).forEach(o => {
+      const on = cur.includes(o.v);
+      grid.append(h('div', { class: 'imgcard' + (on ? ' on' : ''), role: 'checkbox', 'aria-checked': on ? 'true' : 'false', tabindex: '0',
+        onclick: () => { const v = (A[q.id] || []).filter(x => x !== 'none'); A[q.id] = on ? v.filter(x => x !== o.v) : v.concat(o.v); redraw(); } },
+        wait(o.wait), h('div', { class: 'cap' }, o.l)));
+    });
+    box.append(grid);
+    const none = q.opts.find(o => o.excl);
+    box.append(h('div', { style: 'margin-top:10px' }, optRow('checkbox', q.id, none, cur.includes(none.v), e => { A[q.id] = e.target.checked ? [none.v] : []; redraw(); })));
+  }
+
+  if (q.type === 'shelf') {
+    const pair = h('div', { class: 'pair' });
+    q.imgs.forEach(m => pair.append(h('figure', {}, wait(m.wait), h('figcaption', {}, m.l))));
+    box.append(pair);
+    [{ v: 'kobuk', l: 'Kobuk Chip' }, { v: 'oishi', l: 'Oishi' }, KB_OPT].forEach(o =>
+      box.append(optRow('radio', q.id, o, A[q.id] === o.v, () => { A[q.id] = o.v; redraw(); })));
+    if (A[q.id] && A[q.id] !== KB) {
+      const t = h('textarea', { placeholder: 'Vì sao?' }, A[q.why] || '');
+      t.addEventListener('input', () => { A[q.why] = t.value; });
+      box.append(h('p', { class: 'q-title', style: 'margin-top:10px' }, 'Vì sao?'), t);
+    }
+  }
+
+  if (q.type === 'rating') {
+    box.append(h('div', { class: 'legend' }, '1 Hoàn toàn không thích · 2 Hơi không thích · 3 Không ghét cũng không thích (Bình thường) · 4 Khá thích · 5 Rất thích · KB Không biết'));
+    q.rows.forEach(r => {
+      const sc = h('div', { class: 'scale' });
+      ['1', '2', '3', '4', '5', KB].forEach(v => {
+        const inp = h('input', { type: 'radio', name: r.id, value: v });
+        inp.checked = A[r.id] === v;
+        inp.addEventListener('change', () => { A[r.id] = v; redraw(); });
+        sc.append(h('label', { class: A[r.id] === v ? 'on' : '' }, inp, v === KB ? 'KB' : v));
+      });
+      box.append(h('div', { class: 'rate' }, h('div', { class: 'rl' }, r.l), sc));
     });
   }
 
