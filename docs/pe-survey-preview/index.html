@@ -11,8 +11,13 @@
 <div class="sticky-head">
   <div class="preview-band" role="status">Bản xem trước - không ghi nhận dữ liệu</div>
   <header class="top">
-    <div class="brand">Khảo sát snack bột/bim bim</div>
-    <div class="bar"><div id="progress" class="fill"></div></div>
+    <div class="progress-copy">
+      <span id="section-label" class="section-label">Khảo sát snack bột/bim bim</span>
+      <span id="question-count" class="question-count">Sẵn sàng bắt đầu</span>
+    </div>
+    <div class="bar" role="progressbar" aria-label="Tiến độ khảo sát" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+      <div id="progress" class="fill"></div>
+    </div>
   </header>
 </div>
 <main id="app" aria-live="polite">
