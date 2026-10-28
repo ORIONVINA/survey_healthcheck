@@ -1,6 +1,6 @@
 name: Deploy PE Survey preview to Pages
 
-# Repository is public; this workflow publishes only the locked static preview.
+# Repository is public and Pages is enabled; this workflow publishes only the locked static preview.
 on:
   push:
     branches: [main]
